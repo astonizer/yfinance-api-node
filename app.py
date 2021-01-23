@@ -5,21 +5,20 @@ import datetime
 import json
 
 from pandas_datareader import data as pdr
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from dateutil.relativedelta import relativedelta
-
-data_json = open('data.json')
-data = json.load(data_json)
 
 # Initialze flask app
 app = Flask(__name__)
 
 # Fetching small, mid or large cap assets from yahoo finance
-@app.route('/<category>')
-def retrieve_assets(category):
+@app.route('/stocks', methods=['POST'])
+def retrieve_assets():
+    # Process stock details
+    stocks = request.get_json()
+    
     # Create list of symbols of specified category
-    category_data = [d for d in data if d['Type'] == category]
-    symbol = [d['Symbol'] for d in category_data]
+    symbol = [d['Symbol'] for d in stocks]
     present_date = str(datetime.date.today())
 
     # Fetch yahoo finance data
@@ -34,7 +33,7 @@ def retrieve_assets(category):
         curr_data = pdr.get_data_yahoo(symbol, start = past_date)['Close']
 
     prices = []
-    for d in category_data:
+    for d in stocks:
         if str(curr_data.iloc[-1][d['Symbol']]) == 'nan':
             try:
                 if str(curr_data.iloc[-2][d['Symbol']]) != 'nan':
