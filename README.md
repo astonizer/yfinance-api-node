@@ -9,8 +9,8 @@ Useful when the stack you use doesn't have a pre-written library for fetching ya
 
 # Usage
 
-In javascript
-`
+In javascript(using axios)
+
     const stock_details = [
         {
             "Name": "Resonance Speci.",
@@ -22,7 +22,7 @@ In javascript
         },
         ...
     ]
-
+    
     axios({
         method: 'POST',
         url: 'https://yfinance-node.herokuapp.com/mid-cap',
@@ -36,6 +36,5 @@ In javascript
     .catch(err => {
         console.error(err);
     });
-`
 
 [Example Project](https://github.com/astonizer/investment-planner)
