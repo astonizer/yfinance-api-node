@@ -20,17 +20,18 @@ def retrieve_assets():
     # Create list of symbols of specified category
     symbol = [d['Symbol'] for d in stocks]
     present_date = str(datetime.date.today())
-
-    # Fetch yahoo finance data
-    curr_data = pdr.get_data_yahoo(symbol, start = present_date)['Close']
-
-    # Refetch if finance data for current date is not updated
-    if curr_data.empty:
+    
+    try:
+        # Fetch yahoo finance data
+        curr_data = pdr.get_data_yahoo(symbol, start = present_date)['Close']
+    except:
+        # Refetch if finance data for current date is not updated
         past_date = str(datetime.date.today() + relativedelta(days=-1))
         curr_data = pdr.get_data_yahoo(symbol, start = past_date)['Close']
-    if curr_data.empty:
-        past_date = str(datetime.date.today() + relativedelta(days=-2))
-        curr_data = pdr.get_data_yahoo(symbol, start = past_date)['Close']
+
+        if curr_data.empty:
+            past_date = str(datetime.date.today() + relativedelta(days=-2))
+            curr_data = pdr.get_data_yahoo(symbol, start = past_date)['Close']
 
     prices = []
     for d in stocks:
@@ -50,5 +51,94 @@ def retrieve_assets():
 
     return jsonify(prices)
 
+#####                                                                                                 #####
+    ###################################################################################################
+    #                                                                                                 #
+    #             (https://github.com/astonizer/investment-planner) specific routes below             # 
+    #                                                                                                 #
+    ###################################################################################################
+#####                                                                                                 #####
+
+# Analysing investments by user
+@app.route("/investment", methods = ['POST'])
+def investments():
+    # Process user investments
+    user_data = request.get_json()    # stock symbols
+    investments = user_data['Investments']
+
+    # Ininitialize return object
+    inv_details = {
+        'date': [],
+        'price': [],
+        'types': [],
+        'percent_change': [],
+        'net_pl': 0,
+        'total': 0,
+        'total_inv': 0,
+        'symbol': [],
+        'beta': [],
+        'cagr': [],
+        'roi': [],
+        'success': False
+    }
+
+    if len(investments) > 0:
+        # Fetching records of last 5 years
+        start = str(datetime.date.today() + relativedelta(years=-5))
+
+        # Add all user investments
+        for inv in investments:
+            if inv['Quantity'] > 0:
+                inv_details['symbol'].append(inv['Symbol'])
+                inv_details['types'].append(inv['Type'])
+        
+        # Add two global assets
+        inv_details['symbol'].append('^NSEI')
+        inv_details['symbol'].append('^BSESN')
+
+        curr_data = pdr.get_data_yahoo(inv_details['symbol'], start = start)['Close']
+        for inv in investments:
+            inv_symbol = inv['Symbol']
+            if str(curr_data.iloc[-1][inv_symbol]) == 'nan':
+                price = round(curr_data.iloc[-2][inv_symbol], 2)
+            else:
+                price = round(curr_data.iloc[-1][inv_symbol], 2)
+            
+            if inv_symbol[-2:] == 'BO':
+                index = '^BSESN'
+            else:
+                index = '^NSEI'
+                
+            data = curr_data[[inv_symbol, index]]
+            returns = data.pct_change()
+            cov = returns.cov()
+            covar = cov[inv_symbol].iloc[1]
+            var = cov[index].iloc[1]
+            beta = round(covar/var, 2)
+            inv_details['beta'].append(beta)
+            inv_details['price'].append(price)
+        for i in range(len(investments)):
+            if investments[i]['Quantity'] > 0:
+                p = inv_details['price'][i]
+                inv_details['percent_change'].append(round((1 - investments[i]['buyPrice']/p)*100, 2))
+                inv_details['net_pl'] += p * investments[i]['Quantity']
+                da = investments[i]['Date'][:10].split("-")     # Date format = 2021-01-24 
+                date = f"{da[2]}-{da[1]}-{da[0]}"
+                inv_details['date'].append(date)
+                inv_details['total'] += investments[i]['buyPrice'] * investments[i]['Quantity']
+        inv_details['total_inv'] = inv_details['total']
+        returns = user_data['Returns']
+        if len(returns) > 0:
+            for r in returns:
+                inv_details['total_inv'] += r['buyPrice'] * r['Quantity']
+        inv_details['roi'] = round(((inv_details['net_pl']-inv_details['total'])/inv_details['total'])*100, 2)
+        inv_details['cagr'] = round(((inv_details['net_pl']/inv_details['total'])**(1/5)-1)*100, 2)
+
+        # Setting completion as true
+        inv_details['success'] = True
+        return jsonify(inv_details)
+    else:
+        return jsonify(inv_details)
+     
 if __name__ == "__main__":
     app.run(debug=True)

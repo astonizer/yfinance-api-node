@@ -25,7 +25,7 @@ In javascript
 
     axios({
         method: 'POST',
-        url: 'https://yfinance-node.herokuapp.com/mid-cap',
+        url: 'https://yfinance-node.herokuapp.com/stocks',
         data: stock_details
     })
     .then(response => {
