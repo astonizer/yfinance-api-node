@@ -109,6 +109,7 @@ def investments():
             else:
                 index = '^NSEI'
                 
+            # Compute covariance, beta and percent change
             data = curr_data[[inv_symbol, index]]
             returns = data.pct_change()
             cov = returns.cov()
@@ -117,6 +118,8 @@ def investments():
             beta = round(covar/var, 2)
             inv_details['beta'].append(beta)
             inv_details['price'].append(price)
+
+        # Add details into return variable
         for i in range(len(investments)):
             if investments[i]['Quantity'] > 0:
                 p = inv_details['price'][i]
@@ -139,6 +142,44 @@ def investments():
         return jsonify(inv_details)
     else:
         return jsonify(inv_details)
-     
+        
+# Analysing returns of user
+@app.route("/return", methods = ['POST'])
+def returns():
+    # Process invoming json data
+    returns = request.get_json()
+    
+    # Initialize return variable
+    ret_details = {
+        'buy_dates': [],
+        'sell_dates': [],
+        'symbols': [],
+        'type': [],
+        'percent_change': [],
+        'net_pl': 0,
+        'success': False
+    }
+
+    if(len(returns)):
+        for r in returns:
+            # Calculate percent change
+            ret_details['percent_change'].append(round((1 - r['buyPrice']/r['sellPrice'])*100, 2))
+
+            da = r['buyDate'][:10].split("-")
+            date = f"{da[2]}-{da[1]}-{da[0]}"
+            ret_details['buy_dates'].append(date)
+            da = r['sellDate'][:10].split("-") 
+            date = f"{da[2]}-{da[1]}-{da[0]}"
+            ret_details['sell_dates'].append(date)
+            ret_details['symbols'].append(r['Symbol'])
+            ret_details['type'].append(r['Type'])
+
+            # Add net pl
+            ret_details['net_pl'] += r['Quantity'] * (r['sellPrice'] - r['buyPrice'])
+        ret_details['success'] = True
+        return ret_details
+    else:
+        return ret_details
+
 if __name__ == "__main__":
     app.run(debug=True)
