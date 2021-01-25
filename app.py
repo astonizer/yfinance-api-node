@@ -169,54 +169,33 @@ def returns():
     else:
         return ret_details
 
-# @app.route("/portfolio", methods = ['POST'])
-# def portfolio():
-#     invs = db.execute("SELECT * FROM investment WHERE username = :username", {"username": username}).fetchall()
-#     if len(invs) > 0:
-#         category = []
-#         assets = []
-#         symbols = []
-#         for i in invs:
-#             a = db.execute("SELECT * FROM assets WHERE name = :name", {"name": i.asset}).fetchall()[0]
-#             category.append(a.type)
-#             if i.asset not in assets:
-#                 assets.append(i.asset)
-#                 symbols.append(a.symbol)
-#         fig = plt.figure(figsize = (12, 6))
-#         d = dict(Counter(category))
-#         plt.pie(d.values(), labels = d.keys(), autopct = '%1.1f%%')
-#         img = BytesIO()
-#         fig.savefig(img, format = 'png', bbox_inches = 'tight')
-#         img.seek(0)
-#         encoded_pc = b64encode(img.getvalue())
-#         plt.close(fig)
+@app.route("/portfolio", methods = ['POST'])
+def portfolio():
+    # Process invoming json data
+    symbolData = request.get_json()
+    symbols = symbolData['Symbol']
+    values = {
+        'Val': [],
+        'success': False
+    }
 
-#         curr_data = pdr.get_data_yahoo(symbols, start = "2020-01-01")['Adj Close']
-#         # if there's only one symbol then curr_data is a series not dataframe, & series does not have columns attribute
-#         if len(symbols) == 1:
-#             curr_data = pd.DataFrame(curr_data)
-#         stock_graphs = []
-#         count = 0
-#         for c in curr_data.columns:
-#             fig1 = plt.figure(figsize = (12, 6))
-#             plt.plot(curr_data[c], c = np.random.rand(3,))
-#             plt.xlabel('DATE')
-#             plt.ylabel('PRICE')
-#             plt.title(assets[count].upper())
-#             #plt.fill_between(curr_data.index, curr_data[c])
-#             plt.grid()
-#             img1 = BytesIO()
-#             fig1.savefig(img1, format = 'png', bbox_inches = 'tight')
-#             img1.seek(0)
-#             encoded_graph = b64encode(img1.getvalue())
-#             stock_graphs.append(encoded_graph.decode('utf-8'))
-#             count += 1
-#             plt.close(fig1)
-#         db.close()
-#         return render_template("portfolio.html", curruser = username, investments = 'True', pie_chart = encoded_pc.decode('utf-8'), stock_graphs = stock_graphs)
-#     else:
-#         db.close()
-#         return render_template("portfolio.html", curruser = username, investments = 'False')
+    if len(investments) > 0:
+        curr_data = pdr.get_data_yahoo(symbols, start = "2020-01-01")['Adj Close']
+        if len(symbols) == 1:
+            curr_data = pd.DataFrame(curr_data)
+        stock_details = []
+        count = 0
+        dynamic_date = str(datetime.date.today() + relativedelta(months=-1))
+        for c in curr_data.columns:
+            stock_details = [..., {
+                prices: [
+                    dynamic_date: curr_data.iloc[-1][symbol[c]]
+                ]
+            }];
+        values['success'] = True
+        return jsonify(value)
+    else:
+        return jsonify(values)
 
 if __name__ == "__main__":
     app.run(debug=True)
