@@ -32,6 +32,7 @@ In javascript(using axios)
         console.log(response);
 
         // do something with the response
+        // return data is an array of respective asset prices
     })
     .catch(err => {
         console.error(err);

@@ -3,6 +3,7 @@ import pandas as pd
 import yfinance as yf
 import datetime
 import json
+import math
 
 from pandas_datareader import data as pdr
 from flask import Flask, jsonify, request
@@ -82,15 +83,22 @@ def investments():
         'success': False
     }
 
+    # store symbol for ones with zero quantity for better error handling
+    nonZeroQuantityIndexes=[]
+    id=0
+
     if len(investments) > 0:
         # Fetching records of last 5 years
         start = str(datetime.date.today() + relativedelta(years=-5))
 
         # Add all user investments
         for inv in investments:
+            inv_details['symbol'].append(inv['Symbol'])
+            inv_details['types'].append(inv['Type'])
+            
             if inv['Quantity'] > 0:
-                inv_details['symbol'].append(inv['Symbol'])
-                inv_details['types'].append(inv['Type'])
+                nonZeroQuantityIndexes.append(id)
+            id+=1
         
         # Add two global assets
         inv_details['symbol'].append('^NSEI')
@@ -121,14 +129,15 @@ def investments():
 
         # Add details into return variable
         for i in range(len(investments)):
-            if investments[i]['Quantity'] > 0:
-                p = inv_details['price'][i]
-                inv_details['percent_change'].append(round((1 - investments[i]['buyPrice']/p)*100, 2))
+            p = inv_details['price'][i]
+            inv_details['percent_change'].append(round((1 - investments[i]['buyPrice']/p)*100, 2))
+            if(i in nonZeroQuantityIndexes):
                 inv_details['net_pl'] += p * investments[i]['Quantity']
-                da = investments[i]['Date'][:10].split("-")     # Date format = 2021-01-24 
-                date = f"{da[2]}-{da[1]}-{da[0]}"
-                inv_details['date'].append(date)
                 inv_details['total'] += investments[i]['buyPrice'] * investments[i]['Quantity']
+            da = investments[i]['Date'][:10].split("-")     # Date format = 2021-01-24 
+            date = f"{da[2]}-{da[1]}-{da[0]}"
+            inv_details['date'].append(date)
+
         inv_details['total_inv'] = inv_details['total']
         returns = user_data['Returns']
         if len(returns) > 0:
@@ -136,7 +145,13 @@ def investments():
                 inv_details['total_inv'] += r['buyPrice'] * r['Quantity']
         inv_details['roi'] = round(((inv_details['net_pl']-inv_details['total'])/inv_details['total'])*100, 2)
         inv_details['cagr'] = round(((inv_details['net_pl']/inv_details['total'])**(1/5)-1)*100, 2)
-
+        inv_details['net_pl'] = round(inv_details['net_pl'], 2)
+        inv_details['total'] = round(inv_details['total'], 2)
+        inv_details['total_inv'] = round(inv_details['total_inv'], 2)
+        if(math.isnan(inv_details['roi'])):
+            inv_details['roi'] = 0.00
+        if(math.isnan(inv_details['cagr'])):
+            inv_details['cagr'] = 0.00
         # Setting completion as true
         inv_details['success'] = True
         return jsonify(inv_details)
@@ -169,33 +184,33 @@ def returns():
     else:
         return ret_details
 
-@app.route("/portfolio", methods = ['POST'])
-def portfolio():
-    # Process invoming json data
-    symbolData = request.get_json()
-    symbols = symbolData['Symbol']
-    values = {
-        'Val': [],
-        'success': False
-    }
+# @app.route("/portfolio", methods = ['POST'])
+# def portfolio():
+#     # Process invoming json data
+#     symbolData = request.get_json()
+#     symbols = symbolData['Symbol']
+#     values = {
+#         'Val': [],
+#         'success': False
+#     }
 
-    if len(investments) > 0:
-        curr_data = pdr.get_data_yahoo(symbols, start = "2020-01-01")['Adj Close']
-        if len(symbols) == 1:
-            curr_data = pd.DataFrame(curr_data)
-        stock_details = []
-        count = 0
-        dynamic_date = str(datetime.date.today() + relativedelta(months=-1))
-        for c in curr_data.columns:
-            stock_details = [..., {
-                prices: [
-                    dynamic_date: curr_data.iloc[-1][symbol[c]]
-                ]
-            }];
-        values['success'] = True
-        return jsonify(value)
-    else:
-        return jsonify(values)
+#     if len(investments) > 0:
+#         curr_data = pdr.get_data_yahoo(symbols, start = "2020-01-01")['Adj Close']
+#         if len(symbols) == 1:
+#             curr_data = pd.DataFrame(curr_data)
+#         stock_details = []
+#         count = 0
+#         dynamic_date = str(datetime.date.today() + relativedelta(months=-1))
+#         for c in curr_data.columns:
+#             stock_details = [..., {
+#                 prices: [
+#                     dynamic_date: curr_data.iloc[-1][symbol[c]]
+#                 ]
+#             }];
+#         values['success'] = True
+#         return jsonify(value)
+#     else:
+#         return jsonify(values)
 
 if __name__ == "__main__":
     app.run(debug=True)
