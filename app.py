@@ -36,6 +36,8 @@ def retrieve_assets():
 
     prices = []
     for d in stocks:
+        # handle nan values
+        # push the prices of stocks
         if str(curr_data.iloc[-1][d['Symbol']]) == 'nan':
             try:
                 if str(curr_data.iloc[-2][d['Symbol']]) != 'nan':
@@ -96,6 +98,7 @@ def investments():
             inv_details['symbol'].append(inv['Symbol'])
             inv_details['types'].append(inv['Type'])
             
+            # add the indexes for assets having non-zero quantity
             if inv['Quantity'] > 0:
                 nonZeroQuantityIndexes.append(id)
             id+=1
@@ -106,6 +109,7 @@ def investments():
 
         curr_data = pdr.get_data_yahoo(inv_details['symbol'], start = start)['Close']
         for inv in investments:
+            # handle nan values
             inv_symbol = inv['Symbol']
             if str(curr_data.iloc[-1][inv_symbol]) == 'nan':
                 price = round(curr_data.iloc[-2][inv_symbol], 2)
@@ -124,17 +128,21 @@ def investments():
             covar = cov[inv_symbol].iloc[1]
             var = cov[index].iloc[1]
             beta = round(covar/var, 2)
+
+            # push the results in return object
             inv_details['beta'].append(beta)
             inv_details['price'].append(price)
 
-        # Add details into return variable
+        # Add important details into return variable
         for i in range(len(investments)):
             p = inv_details['price'][i]
             inv_details['percent_change'].append(round((1 - investments[i]['buyPrice']/p)*100, 2))
             if(i in nonZeroQuantityIndexes):
                 inv_details['net_pl'] += p * investments[i]['Quantity']
                 inv_details['total'] += investments[i]['buyPrice'] * investments[i]['Quantity']
-            da = investments[i]['Date'][:10].split("-")     # Date format = 2021-01-24 
+            
+            # date format be YYYY/MM/DD
+            da = investments[i]['Date'][:10].split("-")
             date = f"{da[2]}-{da[1]}-{da[0]}"
             inv_details['date'].append(date)
 
@@ -148,11 +156,14 @@ def investments():
         inv_details['net_pl'] = round(inv_details['net_pl'], 2)
         inv_details['total'] = round(inv_details['total'], 2)
         inv_details['total_inv'] = round(inv_details['total_inv'], 2)
+
+        # check for possible infinity values
         if(math.isnan(inv_details['roi'])):
             inv_details['roi'] = 0.00
         if(math.isnan(inv_details['cagr'])):
             inv_details['cagr'] = 0.00
-        # Setting completion as true
+
+        # mark the completion
         inv_details['success'] = True
         return jsonify(inv_details)
     else:
@@ -177,40 +188,14 @@ def returns():
             # Calculate percent change
             ret_details['percent_change'].append(round((1 - r['buyPrice']/r['sellPrice'])*100, 2))
 
-            # Add net pl
+            # Adding net pl
             ret_details['net_pl'] += r['Quantity'] * (r['sellPrice'] - r['buyPrice'])
+
+        # mark the completion
         ret_details['success'] = True
         return ret_details
     else:
         return ret_details
-
-# @app.route("/portfolio", methods = ['POST'])
-# def portfolio():
-#     # Process invoming json data
-#     symbolData = request.get_json()
-#     symbols = symbolData['Symbol']
-#     values = {
-#         'Val': [],
-#         'success': False
-#     }
-
-#     if len(investments) > 0:
-#         curr_data = pdr.get_data_yahoo(symbols, start = "2020-01-01")['Adj Close']
-#         if len(symbols) == 1:
-#             curr_data = pd.DataFrame(curr_data)
-#         stock_details = []
-#         count = 0
-#         dynamic_date = str(datetime.date.today() + relativedelta(months=-1))
-#         for c in curr_data.columns:
-#             stock_details = [..., {
-#                 prices: [
-#                     dynamic_date: curr_data.iloc[-1][symbol[c]]
-#                 ]
-#             }];
-#         values['success'] = True
-#         return jsonify(value)
-#     else:
-#         return jsonify(values)
 
 if __name__ == "__main__":
     app.run(debug=True)
